@@ -273,6 +273,7 @@ func (c *Server) DownloadSmallFileByURI(w http.ResponseWriter, r *http.Request) 
 		err        error
 		data       []byte
 		isDownload bool
+		isCover    bool
 		imgWidth   int
 		imgHeight  int
 		width      string
@@ -307,17 +308,31 @@ func (c *Server) DownloadSmallFileByURI(w http.ResponseWriter, r *http.Request) 
 			imgHeight = Config().ImageMaxHeight
 		}
 	}
+
+	isCover = false
+	if r.FormValue("cover") == "1" {
+		isCover = true
+	}
+
 	data, notFound, err = c.GetSmallFileByURI(w, r)
 	_ = notFound
 	if data != nil && string(data[0]) == "1" {
 		if isDownload {
 			c.SetDownloadHeader(w, r, true)
 		}
+
+		if isCover {
+			c.GetVideoCoverByBytes(w, data[1:], uint(imgWidth), uint(imgHeight))
+			return true, nil
+		}
+
 		if imgWidth != 0 || imgHeight != 0 {
 			c.ResizeImageByBytes(w, data[1:], uint(imgWidth), uint(imgHeight))
 			return true, nil
 		}
+
 		w.Write(data[1:])
+
 		return true, nil
 	}
 	return false, errors.New("not found")
@@ -327,6 +342,7 @@ func (c *Server) DownloadNormalFileByURI(w http.ResponseWriter, r *http.Request)
 	var (
 		err        error
 		isDownload bool
+		isCover    bool
 		imgWidth   int
 		imgHeight  int
 		width      string
@@ -340,6 +356,12 @@ func (c *Server) DownloadNormalFileByURI(w http.ResponseWriter, r *http.Request)
 	if r.FormValue("download") == "0" {
 		isDownload = false
 	}
+
+	isCover = false
+	if r.FormValue("cover") == "1" {
+		isCover = true
+	}
+
 	width = r.FormValue("width")
 	height = r.FormValue("height")
 	if width != "" {
@@ -363,7 +385,14 @@ func (c *Server) DownloadNormalFileByURI(w http.ResponseWriter, r *http.Request)
 	if isDownload {
 		c.SetDownloadHeader(w, r, false)
 	}
+
 	fullpath, _ := c.GetFilePathFromRequest(w, r)
+
+	if isCover {
+		c.GetVideoCover(w, fullpath, uint(imgWidth), uint(imgHeight))
+		return true, nil
+	}
+
 	if imgWidth != 0 || imgHeight != 0 {
 		c.ResizeImage(w, fullpath, uint(imgWidth), uint(imgHeight))
 		return true, nil
